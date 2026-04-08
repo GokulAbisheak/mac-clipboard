@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct HistoryOverlayView: View {
@@ -104,7 +105,7 @@ struct HistoryOverlayView: View {
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
 
-            Text("Copy text in any app — newest clips appear at the top.")
+            Text("Copy text or images in any app — newest clips appear at the top.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -142,10 +143,23 @@ struct HistoryOverlayView: View {
         let isSelected = keyboardState.selectedId == item.id
 
         return VStack(alignment: .leading, spacing: 6) {
-            Text(item.text)
-                .font(.body)
-                .lineLimit(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if item.isImage, let data = item.imagePNGData, let cgImage = cgImageFromClipboardPNGData(data) {
+                let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+                Image(decorative: cgImage, scale: scale, orientation: .up)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(item.previewText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(item.text ?? "")
+                    .font(.body)
+                    .lineLimit(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             Text(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
@@ -170,7 +184,7 @@ struct HistoryOverlayView: View {
         .contextMenu {
             Button {
                 keyboardState.selectedId = item.id
-                store.copyToPasteboard(item.text)
+                store.copyItemToPasteboard(item)
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }

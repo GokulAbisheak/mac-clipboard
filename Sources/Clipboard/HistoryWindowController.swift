@@ -181,7 +181,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
 
         close()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            store.copyToPasteboard(item.text)
+            store.copyItemToPasteboard(item)
             if PasteSimulator.hasAccessibilityPermission {
                 PasteSimulator.pasteUsingCommandV()
             }
