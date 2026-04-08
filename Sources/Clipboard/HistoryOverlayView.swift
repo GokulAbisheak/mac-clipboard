@@ -128,6 +128,9 @@ struct HistoryOverlayView: View {
             .scrollIndicators(.hidden)
             .onChange(of: keyboardState.selectedId) { newId in
                 guard let newId else { return }
+                let scroll = keyboardState.scrollToSelectionForKeyboardNavigation
+                keyboardState.scrollToSelectionForKeyboardNavigation = false
+                guard scroll else { return }
                 withAnimation(.easeOut(duration: 0.2)) {
                     proxy.scrollTo(newId, anchor: .center)
                 }
@@ -162,12 +165,6 @@ struct HistoryOverlayView: View {
                 }
         }
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .highPriorityGesture(
-            TapGesture(count: 2).onEnded {
-                keyboardState.selectedId = item.id
-                onPaste()
-            }
-        )
         .onTapGesture {
             keyboardState.selectedId = item.id
         }

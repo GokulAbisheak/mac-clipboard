@@ -169,6 +169,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
 
         let next = min(max(currentIndex + delta, 0), ids.count - 1)
+        state.scrollToSelectionForKeyboardNavigation = true
         state.selectedId = ids[next]
     }
 

@@ -4,4 +4,6 @@ import Foundation
 @MainActor
 final class HistoryOverlayKeyboardState: ObservableObject {
     @Published var selectedId: UUID?
+
+    var scrollToSelectionForKeyboardNavigation = false
 }
