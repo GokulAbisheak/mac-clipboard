@@ -2,6 +2,8 @@ import AppKit
 import ApplicationServices
 
 enum PasteSimulator {
+    private static var didRequestAccessibilityPrompt = false
+
     /// Posts Command+V to the system event tap. Requires Accessibility permission for the app.
     static func pasteUsingCommandV() {
         let source = CGEventSource(stateID: .hidSystemState)
@@ -16,10 +18,13 @@ enum PasteSimulator {
     }
 
     static var hasAccessibilityPermission: Bool {
-        AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary)
+        AXIsProcessTrustedWithOptions(nil)
     }
 
     static func promptForAccessibilityIfNeeded() {
-        _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+        guard !didRequestAccessibilityPrompt else { return }
+        didRequestAccessibilityPrompt = true
+        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
     }
 }

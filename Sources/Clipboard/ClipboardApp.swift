@@ -17,7 +17,7 @@ private struct MenuBarContentView: View {
     @State private var launchAtLogin = LoginItemManager.isLaunchAtLoginEnabled
 
     var body: some View {
-        Button("Show clipboard history (⌃⌘V)", systemImage: "list.bullet.rectangle.portrait") {
+        Button("Show clipboard history (⇧⌘V)", systemImage: "list.bullet.rectangle.portrait") {
             HistoryWindowController.shared.toggle(store: store)
         }
         Divider()

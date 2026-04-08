@@ -38,7 +38,7 @@ private func globalHotKeyHandler(
     return noErr
 }
 
-/// Global ⌃⌘V (Control + Command + V), similar to Windows Win+V.
+/// Global ⇧⌘V (Shift + Command + V).
 final class GlobalHotKey {
     static let shared = GlobalHotKey()
 
@@ -65,7 +65,7 @@ final class GlobalHotKey {
 
         // FourCharCode 'CLIP'
         let hotKeyID = EventHotKeyID(signature: OSType(0x434C_4950), id: 1)
-        let modifiers = UInt32(cmdKey | controlKey)
+        let modifiers = UInt32(cmdKey | shiftKey)
         RegisterEventHotKey(UInt32(kVK_ANSI_V), modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
     }
 
