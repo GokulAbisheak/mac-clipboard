@@ -14,15 +14,16 @@ struct MacClipboardApp: App {
 
 private struct MenuBarContentView: View {
     @ObservedObject private var store = ClipboardStore.shared
-    @ObservedObject private var accessibility = AccessibilityPermissionCoordinator.shared
     @State private var launchAtLogin = LoginItemManager.isLaunchAtLoginEnabled
 
     var body: some View {
-        Button("Show clipboard history (⌃⌘V)") {
+        Button("Show clipboard history (⌃⌘V)", systemImage: "list.bullet.rectangle.portrait") {
             HistoryWindowController.shared.toggle(store: store)
         }
         Divider()
-        Toggle("Open at login", isOn: $launchAtLogin)
+        Toggle(isOn: $launchAtLogin) {
+            Label("Open at login", systemImage: "powerplug.portrait.fill")
+        }
             .onChange(of: launchAtLogin) { v in
                 LoginItemManager.isLaunchAtLoginEnabled = v
             }
@@ -30,12 +31,7 @@ private struct MenuBarContentView: View {
                 launchAtLogin = LoginItemManager.isLaunchAtLoginEnabled
             }
         Divider()
-        if accessibility.showManualPasteButton {
-            Button("Allow pasting into apps…") {
-                accessibility.openAccessibilitySettingsPrompt()
-            }
-        }
-        Button("Quit MacClipboard") {
+        Button("Quit MacClipboard", systemImage: "power") {
             NSApplication.shared.terminate(nil)
         }
     }

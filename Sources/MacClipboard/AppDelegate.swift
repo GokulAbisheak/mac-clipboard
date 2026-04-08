@@ -6,8 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardStore.shared.startMonitoring()
         LoginItemManager.syncOnLaunch()
 
-        AccessibilityPermissionCoordinator.runLaunchAccessibilityFlow()
-
         NotificationCenter.default.addObserver(
             forName: .toggleClipboardHistory,
             object: nil,
@@ -19,11 +17,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationDidResignActive(_ notification: Notification) {
-        AccessibilityPermissionCoordinator.markManualButtonNeededIfStillUntrusted()
-    }
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        AccessibilityPermissionCoordinator.shared.refresh()
-    }
 }
