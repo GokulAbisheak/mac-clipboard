@@ -9,33 +9,41 @@ struct HistoryOverlayView: View {
     @FocusState private var listFocused: Bool
 
     var body: some View {
-        ZStack {
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        GeometryReader { geometry in
+            let cardWidth = max(0, geometry.size.width - 40)
+            let cardHeight = max(0, geometry.size.height - 48)
 
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                separator
-                Group {
-                    if store.items.isEmpty {
-                        emptyState
-                    } else {
-                        historyScroll
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .onTapGesture { onDismiss() }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    separator
+                    Group {
+                        if store.items.isEmpty {
+                            emptyState
+                        } else {
+                            historyScroll
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    separator
+                    footer
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                separator
-                footer
+                .padding(20)
+                .background {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(.regularMaterial)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .frame(width: cardWidth, height: cardHeight)
             }
-            .padding(20)
-            .background {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.regularMaterial)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-            .padding(.top, 28)
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: 400, minHeight: 440)
         .focused($listFocused)
         .onAppear {

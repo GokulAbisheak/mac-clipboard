@@ -47,6 +47,11 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         teardownWindowResources()
     }
 
+    func windowDidResignKey(_ notification: Notification) {
+        guard let resigned = notification.object as? NSWindow, resigned === window else { return }
+        close()
+    }
+
     private func show(store: ClipboardStore) {
         close()
         teardownWindowResources()
