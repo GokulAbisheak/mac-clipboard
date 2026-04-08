@@ -144,7 +144,6 @@ struct HistoryOverlayView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text(item.text)
                 .font(.body)
-                .textSelection(.enabled)
                 .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -169,6 +168,12 @@ struct HistoryOverlayView: View {
             keyboardState.selectedId = item.id
         }
         .contextMenu {
+            Button {
+                keyboardState.selectedId = item.id
+                store.copyToPasteboard(item.text)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
             Button {
                 keyboardState.selectedId = item.id
                 onPaste()
