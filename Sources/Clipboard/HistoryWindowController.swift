@@ -11,17 +11,18 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private var keyboardState: HistoryOverlayKeyboardState?
     private var keyMonitor: Any?
     private var activationPolicyBeforeHistory: NSApplication.ActivationPolicy?
+    private var appToPasteInto: NSRunningApplication?
 
     private override init() {
         super.init()
     }
 
-    func toggle(store: ClipboardStore) {
+    func toggle(store: ClipboardStore, hotkeyPasteTarget: NSRunningApplication? = nil) {
         if let w = window, w.isVisible {
             close()
             return
         }
-        show(store: store)
+        show(store: store, preferredPasteTarget: hotkeyPasteTarget)
     }
 
     func close() {
@@ -40,6 +41,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         keyboardState = nil
         hosting = nil
         window = nil
+        appToPasteInto = nil
         restoreActivationPolicyAfterHistory()
     }
 
@@ -52,9 +54,18 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         close()
     }
 
-    private func show(store: ClipboardStore) {
+    private func show(store: ClipboardStore, preferredPasteTarget: NSRunningApplication? = nil) {
         close()
         teardownWindowResources()
+
+        if let preferredPasteTarget {
+            appToPasteInto = preferredPasteTarget
+        } else if let front = NSWorkspace.shared.frontmostApplication,
+                  front.processIdentifier != NSRunningApplication.current.processIdentifier {
+            appToPasteInto = front
+        } else {
+            appToPasteInto = nil
+        }
 
         let state = HistoryOverlayKeyboardState()
         state.selectedId = store.items.first?.id
@@ -179,11 +190,17 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
               let item = store.items.first(where: { $0.id == id })
         else { return }
 
+        let pasteTarget = appToPasteInto
         close()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             store.copyItemToPasteboard(item)
-            if PasteSimulator.hasAccessibilityPermission {
-                PasteSimulator.pasteUsingCommandV()
+            if let app = pasteTarget {
+                _ = app.activate(options: [.activateIgnoringOtherApps])
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                if PasteSimulator.hasAccessibilityPermission {
+                    PasteSimulator.pasteUsingCommandV()
+                }
             }
         }
     }

@@ -23,7 +23,17 @@ private func globalHotKeyHandler(
     )
     guard err == noErr else { return err }
     DispatchQueue.main.async {
-        NotificationCenter.default.post(name: .toggleClipboardHistory, object: nil)
+        // Snapshot before our app steals focus from Finder / the target app (e.g. for desktop paste).
+        let front = NSWorkspace.shared.frontmostApplication
+        let pasteTarget: NSRunningApplication? = {
+            guard let front else { return nil }
+            return front.processIdentifier == NSRunningApplication.current.processIdentifier ? nil : front
+        }()
+        NotificationCenter.default.post(
+            name: .toggleClipboardHistory,
+            object: nil,
+            userInfo: ["pasteTarget": pasteTarget as Any]
+        )
     }
     return noErr
 }

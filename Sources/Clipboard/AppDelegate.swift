@@ -10,9 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: .toggleClipboardHistory,
             object: nil,
             queue: .main
-        ) { _ in
+        ) { note in
+            let target = note.userInfo?["pasteTarget"] as? NSRunningApplication
             Task { @MainActor in
-                HistoryWindowController.shared.toggle(store: ClipboardStore.shared)
+                HistoryWindowController.shared.toggle(store: ClipboardStore.shared, hotkeyPasteTarget: target)
             }
         }
     }
