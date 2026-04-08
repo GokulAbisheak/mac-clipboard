@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MacClipboardApp: App {
+struct ClipboardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -31,7 +31,7 @@ private struct MenuBarContentView: View {
                 launchAtLogin = LoginItemManager.isLaunchAtLoginEnabled
             }
         Divider()
-        Button("Quit MacClipboard", systemImage: "power") {
+        Button("Quit Clipboard", systemImage: "power") {
             NSApplication.shared.terminate(nil)
         }
     }

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>MacClipboard</string>
+	<string>Clipboard</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.macclipboard.app</string>
+	<string>com.clipboard.app</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>CFBundleShortVersionString</key>

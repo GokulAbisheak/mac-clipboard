@@ -30,7 +30,7 @@ final class ClipboardStore: ObservableObject {
 
     private var persistenceURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = base.appendingPathComponent("MacClipboard", isDirectory: true)
+        let dir = base.appendingPathComponent("Clipboard", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("history.json")
     }

@@ -2,18 +2,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "MacClipboard",
+    name: "Clipboard",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "MacClipboard", targets: ["MacClipboard"])
+        .executable(name: "Clipboard", targets: ["Clipboard"])
     ],
     targets: [
         .executableTarget(
-            name: "MacClipboard",
+            name: "Clipboard",
             dependencies: [],
-            path: "Sources/MacClipboard",
+            path: "Sources/Clipboard",
             linkerSettings: [
                 .linkedFramework("Carbon")
             ]
