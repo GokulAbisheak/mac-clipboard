@@ -14,6 +14,9 @@ let package = Package(
             name: "Clipboard",
             dependencies: [],
             path: "Sources/Clipboard",
+            resources: [
+                .copy("Resources")
+            ],
             linkerSettings: [
                 .linkedFramework("Carbon")
             ]

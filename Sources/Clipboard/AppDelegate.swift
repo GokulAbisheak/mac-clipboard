@@ -2,6 +2,11 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let url = Bundle.module.url(forResource: "clipboard", withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            NSApp.applicationIconImage = image
+        }
+
         GlobalHotKey.shared.register()
         ClipboardStore.shared.startMonitoring()
         LoginItemManager.syncOnLaunch()
