@@ -105,7 +105,7 @@ struct HistoryOverlayView: View {
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
 
-            Text("Copy text or images in any app — newest clips appear at the top.")
+            Text("Copy text, images, files, or folders — newest clips appear at the top.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -143,7 +143,23 @@ struct HistoryOverlayView: View {
         let isSelected = keyboardState.selectedId == item.id
 
         return VStack(alignment: .leading, spacing: 6) {
-            if item.isImage, let data = item.imagePNGData, let cgImage = cgImageFromClipboardPNGData(data) {
+            if item.isFileItems {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: fileRowSymbol(for: item))
+                        .font(.system(size: 26, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 40, height: 40)
+                        .background {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(.thinMaterial)
+                        }
+                    Text(item.previewText)
+                        .font(.body)
+                        .lineLimit(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else if item.isImage, let data = item.imagePNGData, let cgImage = cgImageFromClipboardPNGData(data) {
                 let scale = NSScreen.main?.backingScaleFactor ?? 2.0
                 Image(decorative: cgImage, scale: scale, orientation: .up)
                     .resizable()
@@ -232,6 +248,29 @@ struct HistoryOverlayView: View {
     private var selectedItem: ClipboardItem? {
         guard let id = keyboardState.selectedId else { return nil }
         return store.items.first { $0.id == id }
+    }
+
+    private func fileRowSymbol(for item: ClipboardItem) -> String {
+        guard let refs = item.referencedFileURLs, !refs.isEmpty else { return "doc.on.doc.fill" }
+        let urls = refs.compactMap { URL(string: $0) }
+        guard !urls.isEmpty else { return "doc.on.doc.fill" }
+        var dirCount = 0
+        var fileCount = 0
+        for u in urls {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir), isDir.boolValue {
+                dirCount += 1
+            } else {
+                fileCount += 1
+            }
+        }
+        if dirCount > 0, fileCount == 0 {
+            return "folder.fill"
+        }
+        if fileCount > 0, dirCount == 0 {
+            return urls.count == 1 ? "doc.fill" : "doc.on.doc.fill"
+        }
+        return "square.stack.3d.up.fill"
     }
 }
 

@@ -7,19 +7,25 @@ import UniformTypeIdentifiers
 struct ClipboardItem: Identifiable, Equatable, Codable {
     let id: UUID
     let copiedAt: Date
-    /// Plain text clip; nil when the clip is image-only.
     var text: String?
-    /// PNG bytes for an image clip; nil when the clip is text-only.
     var imagePNGData: Data?
-    /// Original filename when the clip came from a file used for Finder-style names when pasting as a file.
     var sourceFilename: String?
+    var referencedFileURLs: [String]?
 
-    init(id: UUID = UUID(), copiedAt: Date = Date(), text: String?, imagePNGData: Data?, sourceFilename: String? = nil) {
+    init(
+        id: UUID = UUID(),
+        copiedAt: Date = Date(),
+        text: String?,
+        imagePNGData: Data?,
+        sourceFilename: String? = nil,
+        referencedFileURLs: [String]? = nil
+    ) {
         self.id = id
         self.copiedAt = copiedAt
         self.text = text
         self.imagePNGData = imagePNGData
         self.sourceFilename = sourceFilename
+        self.referencedFileURLs = referencedFileURLs
     }
 
     init(from decoder: Decoder) throws {
@@ -33,6 +39,7 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         }
         imagePNGData = try c.decodeIfPresent(Data.self, forKey: .imagePNGData)
         sourceFilename = try c.decodeIfPresent(String.self, forKey: .sourceFilename)
+        referencedFileURLs = try c.decodeIfPresent([String].self, forKey: .referencedFileURLs)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -42,16 +49,21 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         try c.encodeIfPresent(text, forKey: .text)
         try c.encodeIfPresent(imagePNGData, forKey: .imagePNGData)
         try c.encodeIfPresent(sourceFilename, forKey: .sourceFilename)
+        try c.encodeIfPresent(referencedFileURLs, forKey: .referencedFileURLs)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, copiedAt, text, imagePNGData, sourceFilename
+        case id, copiedAt, text, imagePNGData, sourceFilename, referencedFileURLs
     }
 
     var isImage: Bool { imagePNGData != nil }
+    var isFileItems: Bool { referencedFileURLs.map { !$0.isEmpty } ?? false }
 
-    /// One-line preview for the list (not used for paste).
+    /// One-line preview for the list.
     var previewText: String {
+        if isFileItems, let refs = referencedFileURLs {
+            return Self.fileListPreview(refs: refs)
+        }
         if isImage {
             guard let d = imagePNGData,
                   let src = CGImageSourceCreateWithData(d as CFData, nil),
@@ -63,10 +75,38 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
         }
         return text ?? ""
     }
+
+    private static func fileListPreview(refs: [String]) -> String {
+        let urls = refs.compactMap { URL(string: $0) }
+        guard !urls.isEmpty else { return "Files" }
+        var dirCount = 0
+        var fileCount = 0
+        for u in urls {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir), isDir.boolValue {
+                dirCount += 1
+            } else {
+                fileCount += 1
+            }
+        }
+        let firstName = urls[0].lastPathComponent
+        let kind: String
+        if dirCount > 0, fileCount == 0 {
+            kind = urls.count == 1 ? "Folder" : "Folders"
+        } else if fileCount > 0, dirCount == 0 {
+            kind = urls.count == 1 ? "File" : "Files"
+        } else {
+            kind = "Items"
+        }
+        var s = "\(kind) · \(firstName)"
+        if urls.count > 1 {
+            s += " + \(urls.count - 1) more"
+        }
+        return s
+    }
 }
 
 private extension NSImage {
-    /// Raster PNG for storage and paste. Handles file-backed / lazy images that would otherwise show as icons in SwiftUI.
     func pngDataForClipboard() -> Data? {
         for rep in representations {
             if let bmp = rep as? NSBitmapImageRep,
@@ -109,13 +149,11 @@ private extension NSImage {
     }
 }
 
-/// Decodes stored PNG bytes to a bitmap CGImage (avoids AppKit file-icon style NSImage in SwiftUI).
 func cgImageFromClipboardPNGData(_ data: Data) -> CGImage? {
     guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
     return CGImageSourceCreateImageAtIndex(source, 0, nil)
 }
 
-/// Keeps clipboard history in copy order (newest at index 0). Persists across app restarts.
 @MainActor
 final class ClipboardStore: ObservableObject {
     static let shared = ClipboardStore()
@@ -169,18 +207,38 @@ final class ClipboardStore: ObservableObject {
         guard count != lastChangeCount else { return }
         lastChangeCount = count
 
-        if let pair = readImageWithSource(from: pb), let png = pair.image.pngDataForClipboard() {
-            if let first = items.first, first.imagePNGData == png { return }
-            let entry = ClipboardItem(text: nil, imagePNGData: png, sourceFilename: pair.sourceFilename)
+        let existingFiles = collectExistingFileURLs(from: pb)
+        if !existingFiles.isEmpty {
+            let strings = existingFiles.map(\.absoluteString).sorted()
+            if let first = items.first, first.referencedFileURLs == strings { return }
+            let entry = ClipboardItem(
+                text: nil,
+                imagePNGData: nil,
+                sourceFilename: nil,
+                referencedFileURLs: strings
+            )
+            items.insert(entry, at: 0)
+            trimAndSave()
+            return
+        }
+
+        if let pair = readRasterImageFromPasteboard(pb), let png = pair.image.pngDataForClipboard() {
+            if let first = items.first, first.imagePNGData == png, first.referencedFileURLs == nil { return }
+            let entry = ClipboardItem(
+                text: nil,
+                imagePNGData: png,
+                sourceFilename: pair.sourceFilename,
+                referencedFileURLs: nil
+            )
             items.insert(entry, at: 0)
             trimAndSave()
             return
         }
 
         guard let text = pb.string(forType: .string), !text.isEmpty else { return }
-        if let first = items.first, first.text == text, !first.isImage { return }
+        if let first = items.first, first.text == text, !first.isImage, !first.isFileItems { return }
 
-        let entry = ClipboardItem(text: text, imagePNGData: nil, sourceFilename: nil)
+        let entry = ClipboardItem(text: text, imagePNGData: nil, sourceFilename: nil, referencedFileURLs: nil)
         items.insert(entry, at: 0)
         trimAndSave()
     }
@@ -190,11 +248,8 @@ final class ClipboardStore: ObservableObject {
         let sourceFilename: String?
     }
 
-    /// Reads a raster image from the pasteboard. File references are handled **before** `NSImage` so Finder’s generic file icon is not mistaken for the image.
-    private func readImageWithSource(from pb: NSPasteboard) -> ImagePasteboardPair? {
-        if let pair = readImageFromFilePasteboard(pb) {
-            return ImagePasteboardPair(image: pair.image, sourceFilename: pair.sourceFilename)
-        }
+    /// Raster image only (TIFF/PNG/`NSImage`); file copies are handled as `referencedFileURLs` first.
+    private func readRasterImageFromPasteboard(_ pb: NSPasteboard) -> ImagePasteboardPair? {
         if let tiff = pb.data(forType: .tiff), let img = NSImage(data: tiff) {
             return ImagePasteboardPair(image: img, sourceFilename: nil)
         }
@@ -209,70 +264,50 @@ final class ClipboardStore: ObservableObject {
         return nil
     }
 
-    /// Loads pixels from copied **file** URLs (Finder icon selection, etc.), not the preview icon on the pasteboard.
-    private func readImageFromFilePasteboard(_ pb: NSPasteboard) -> (image: NSImage, sourceFilename: String)? {
+    private func collectExistingFileURLs(from pb: NSPasteboard) -> [URL] {
         var urls: [URL] = []
+        var seenPaths = Set<String>()
+
+        func append(_ u: URL) {
+            let std = u.standardizedFileURL
+            guard std.isFileURL else { return }
+            let path = std.path
+            guard seenPaths.insert(path).inserted else { return }
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return }
+            urls.append(std)
+        }
 
         if pb.canReadObject(forClasses: [NSURL.self], options: nil),
            let objects = pb.readObjects(forClasses: [NSURL.self], options: nil) {
             for obj in objects {
-                let url: URL?
                 if let u = obj as? URL {
-                    url = u
+                    append(u)
                 } else if let n = obj as? NSURL {
-                    url = n as URL
-                } else {
-                    url = nil
-                }
-                if let u = url, u.isFileURL {
-                    urls.append(u.standardizedFileURL)
+                    append(n as URL)
                 }
             }
         }
 
         if let s = pb.string(forType: .fileURL),
-           let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)),
-           u.isFileURL {
-            urls.append(u.standardizedFileURL)
+           let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            append(u)
         }
 
-        let filenamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
-        if let paths = pb.propertyList(forType: filenamesType) as? [String] {
+        if let paths = pb.propertyList(forType: Self.filenamesPboardType) as? [String] {
             for p in paths {
-                urls.append(URL(fileURLWithPath: p).standardizedFileURL)
+                append(URL(fileURLWithPath: p))
             }
         }
 
         for item in pb.pasteboardItems ?? [] {
             if let s = item.string(forType: .fileURL),
-               let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)),
-               u.isFileURL {
-                urls.append(u.standardizedFileURL)
+               let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                append(u)
             }
         }
 
-        var seen: Set<URL> = []
-        for url in urls where seen.insert(url).inserted {
-            if let img = Self.loadRasterFromImageFile(at: url) {
-                return (image: img, sourceFilename: url.lastPathComponent)
-            }
-        }
-        return nil
-    }
-
-    private static func loadRasterFromImageFile(at url: URL) -> NSImage? {
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else {
-            return nil
-        }
-        guard let data = try? Data(contentsOf: url), data.count > 32 else { return nil }
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              CGImageSourceGetCount(source) > 0,
-              let typeId = CGImageSourceGetType(source),
-              let ut = UTType(typeId as String),
-              ut.conforms(to: .image)
-        else { return nil }
-        return NSImage(data: data)
+        return urls
     }
 
     private func trimAndSave() {
@@ -319,16 +354,35 @@ final class ClipboardStore: ObservableObject {
         return directory.appendingPathComponent("\(UUID().uuidString).png")
     }
 
-    /// Places the clip on the pasteboard for picking from history or pasting into another app.
+    private static func urlIsDirectory(_ url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return false }
+        return isDir.boolValue
+    }
+
     func copyItemToPasteboard(_ item: ClipboardItem) {
         let pb = NSPasteboard.general
         pb.clearContents()
-        if let png = item.imagePNGData, !png.isEmpty {
+        if let refs = item.referencedFileURLs, !refs.isEmpty {
+            copyFileItemsToPasteboard(refs: refs, pb: pb)
+        } else if let png = item.imagePNGData, !png.isEmpty {
             copyImageToPasteboard(item: item, png: png, pb: pb)
         } else if let text = item.text {
             pb.setString(text, forType: .string)
         }
         lastChangeCount = pb.changeCount
+    }
+
+    private func copyFileItemsToPasteboard(refs: [String], pb: NSPasteboard) {
+        let urls = refs.compactMap { URL(string: $0) }.filter {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
+        guard !urls.isEmpty else { return }
+
+        let nsurls = urls.map { url in
+            NSURL(fileURLWithPath: url.path, isDirectory: Self.urlIsDirectory(url))
+        }
+        pb.writeObjects(nsurls)
     }
 
     private func copyImageToPasteboard(item: ClipboardItem, png: Data, pb: NSPasteboard) {
