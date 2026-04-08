@@ -143,7 +143,18 @@ struct HistoryOverlayView: View {
         let isSelected = keyboardState.selectedId == item.id
 
         return VStack(alignment: .leading, spacing: 6) {
-            if item.isFileItems {
+            if item.isFileItems, let data = item.imagePNGData, let cgImage = cgImageFromClipboardPNGData(data) {
+                let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+                Image(decorative: cgImage, scale: scale, orientation: .up)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(item.previewText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if item.isFileItems {
                 HStack(alignment: .center, spacing: 12) {
                     Image(systemName: fileRowSymbol(for: item))
                         .font(.system(size: 26, weight: .medium))

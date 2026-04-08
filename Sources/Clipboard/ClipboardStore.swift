@@ -62,7 +62,15 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
     /// One-line preview for the list.
     var previewText: String {
         if isFileItems, let refs = referencedFileURLs {
-            return Self.fileListPreview(refs: refs)
+            let base = Self.fileListPreview(refs: refs)
+            if let d = imagePNGData,
+               let src = CGImageSourceCreateWithData(d as CFData, nil),
+               let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+               let w = props[kCGImagePropertyPixelWidth] as? NSNumber,
+               let h = props[kCGImagePropertyPixelHeight] as? NSNumber {
+                return "\(base) · \(w.intValue) × \(h.intValue)"
+            }
+            return base
         }
         if isImage {
             guard let d = imagePNGData,
@@ -211,10 +219,11 @@ final class ClipboardStore: ObservableObject {
         if !existingFiles.isEmpty {
             let strings = existingFiles.map(\.absoluteString).sorted()
             if let first = items.first, first.referencedFileURLs == strings { return }
+            let preview = Self.pngPreviewFromFirstRasterImage(in: existingFiles)
             let entry = ClipboardItem(
                 text: nil,
-                imagePNGData: nil,
-                sourceFilename: nil,
+                imagePNGData: preview?.png,
+                sourceFilename: preview?.sourceFilename,
                 referencedFileURLs: strings
             )
             items.insert(entry, at: 0)
@@ -260,6 +269,30 @@ final class ClipboardStore: ObservableObject {
            let objects = pb.readObjects(forClasses: [NSImage.self], options: nil),
            let img = objects.compactMap({ $0 as? NSImage }).first {
             return ImagePasteboardPair(image: img, sourceFilename: nil)
+        }
+        return nil
+    }
+
+    private static func loadRasterFromImageFile(at url: URL) -> NSImage? {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else {
+            return nil
+        }
+        guard let data = try? Data(contentsOf: url), data.count > 32 else { return nil }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(source) > 0,
+              let typeId = CGImageSourceGetType(source),
+              let ut = UTType(typeId as String),
+              ut.conforms(to: .image)
+        else { return nil }
+        return NSImage(data: data)
+    }
+
+    private static func pngPreviewFromFirstRasterImage(in urls: [URL]) -> (png: Data, sourceFilename: String)? {
+        for url in urls {
+            guard let img = loadRasterFromImageFile(at: url) else { continue }
+            guard let png = img.pngDataForClipboard(), !png.isEmpty else { continue }
+            return (png, url.lastPathComponent)
         }
         return nil
     }
