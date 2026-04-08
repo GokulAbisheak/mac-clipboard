@@ -2,20 +2,25 @@ import SwiftUI
 
 struct HistoryOverlayView: View {
     @ObservedObject var store: ClipboardStore
+    @ObservedObject var keyboardState: HistoryOverlayKeyboardState
+    @ObservedObject private var accessibility = AccessibilityPermissionCoordinator.shared
     var onDismiss: () -> Void
+    var onPaste: () -> Void
 
-    @State private var selection: UUID?
     @FocusState private var listFocused: Bool
+
+    private var selectionBinding: Binding<UUID?> {
+        Binding(
+            get: { keyboardState.selectedId },
+            set: { keyboardState.selectedId = $0 }
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Clipboard history")
+                Text("Clipboard")
                     .font(.headline)
-                Spacer()
-                Text("⌃⌘V")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -37,7 +42,7 @@ struct HistoryOverlayView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             } else {
-                List(selection: $selection) {
+                List(selection: selectionBinding) {
                     ForEach(store.items) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.text)
@@ -50,8 +55,8 @@ struct HistoryOverlayView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) {
-                            selection = item.id
-                            pasteSelected()
+                            keyboardState.selectedId = item.id
+                            onPaste()
                         }
                         .tag(Optional(item.id))
                     }
@@ -70,21 +75,21 @@ struct HistoryOverlayView: View {
             HStack {
                 Button("Clear all") {
                     store.clearAll()
-                    selection = nil
+                    keyboardState.selectedId = nil
                 }
                 .disabled(store.items.isEmpty)
 
                 Spacer()
 
-                if !PasteSimulator.hasAccessibilityPermission {
+                if accessibility.showManualPasteButton {
                     Button("Allow pasting…") {
-                        PasteSimulator.promptForAccessibilityIfNeeded()
+                        accessibility.openAccessibilitySettingsPrompt()
                     }
-                    .help("Grant Accessibility so the Paste button can send ⌘V to the active app.")
+                    .help("Open Accessibility settings so Return can paste into the active app with ⌘V.")
                 }
 
                 Button("Paste") {
-                    pasteSelected()
+                    onPaste()
                 }
                 .keyboardShortcut(.return, modifiers: [])
                 .disabled(selectedItem == nil)
@@ -93,32 +98,21 @@ struct HistoryOverlayView: View {
         }
         .frame(minWidth: 380, minHeight: 400)
         .onAppear {
-            if selection == nil {
-                selection = store.items.first?.id
+            if keyboardState.selectedId == nil {
+                keyboardState.selectedId = store.items.first?.id
             }
             listFocused = true
         }
         .onChange(of: store.items) { newItems in
-            if let s = selection, !newItems.contains(where: { $0.id == s }) {
-                selection = newItems.first?.id
+            if let s = keyboardState.selectedId, !newItems.contains(where: { $0.id == s }) {
+                keyboardState.selectedId = newItems.first?.id
             }
         }
         .onExitCommand { onDismiss() }
     }
 
     private var selectedItem: ClipboardItem? {
-        guard let id = selection else { return nil }
+        guard let id = keyboardState.selectedId else { return nil }
         return store.items.first { $0.id == id }
-    }
-
-    private func pasteSelected() {
-        guard let item = selectedItem else { return }
-        onDismiss()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            store.copyToPasteboard(item.text)
-            if PasteSimulator.hasAccessibilityPermission {
-                PasteSimulator.pasteUsingCommandV()
-            }
-        }
     }
 }
