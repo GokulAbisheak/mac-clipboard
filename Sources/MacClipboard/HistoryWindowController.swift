@@ -64,14 +64,17 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         let host = NSHostingController(rootView: view)
         hosting = host
 
-        let rect = NSRect(x: 0, y: 0, width: 420, height: 520)
+        let rect = NSRect(x: 0, y: 0, width: 460, height: 560)
         let w = ClipboardKeyWindow(
             contentRect: rect,
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            styleMask: [.borderless, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         w.title = "Clipboard"
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.isMovableByWindowBackground = true
         w.contentViewController = host
         w.level = .floating
         w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -89,10 +92,22 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         w.makeKey()
 
+        host.view.wantsLayer = true
+        host.view.layer?.backgroundColor = NSColor.clear.cgColor
+        host.view.layer?.borderWidth = 0
+        host.view.layer?.masksToBounds = false
+        w.contentView?.wantsLayer = true
+        w.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+        w.contentView?.layer?.borderWidth = 0
+
         DispatchQueue.main.async { [weak w, weak host] in
             guard let w, let host else { return }
             guard w.isVisible else { return }
             _ = w.makeFirstResponder(host.view)
+        }
+
+        if !PasteSimulator.hasAccessibilityPermission {
+            PasteSimulator.promptForAccessibilityIfNeeded()
         }
     }
 
