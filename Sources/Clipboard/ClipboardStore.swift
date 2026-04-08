@@ -114,7 +114,7 @@ struct ClipboardItem: Identifiable, Equatable, Codable {
     }
 }
 
-private extension NSImage {
+extension NSImage {
     func pngDataForClipboard() -> Data? {
         for rep in representations {
             if let bmp = rep as? NSBitmapImageRep,
@@ -207,6 +207,19 @@ final class ClipboardStore: ObservableObject {
     func stopMonitoring() {
         timer?.invalidate()
         timer = nil
+    }
+
+    func ingestScreenshotImage(png: Data, sourceFilename: String) {
+        if let first = items.first, first.imagePNGData == png, first.referencedFileURLs == nil { return }
+        let entry = ClipboardItem(
+            text: nil,
+            imagePNGData: png,
+            sourceFilename: sourceFilename,
+            referencedFileURLs: nil
+        )
+        items.insert(entry, at: 0)
+        trimAndSave()
+        lastChangeCount = NSPasteboard.general.changeCount
     }
 
     private func pollPasteboard() {

@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         GlobalHotKey.shared.register()
         ClipboardStore.shared.startMonitoring()
+        ScreenshotClipboardWatcher.shared.applySettings()
         LoginItemManager.syncOnLaunch()
 
         NotificationCenter.default.addObserver(
