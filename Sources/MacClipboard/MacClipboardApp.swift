@@ -14,6 +14,7 @@ struct MacClipboardApp: App {
 
 private struct MenuBarContentView: View {
     @ObservedObject private var store = ClipboardStore.shared
+    @ObservedObject private var accessibility = AccessibilityPermissionCoordinator.shared
     @State private var launchAtLogin = LoginItemManager.isLaunchAtLoginEnabled
 
     var body: some View {
@@ -29,9 +30,9 @@ private struct MenuBarContentView: View {
                 launchAtLogin = LoginItemManager.isLaunchAtLoginEnabled
             }
         Divider()
-        if !PasteSimulator.hasAccessibilityPermission {
+        if accessibility.showManualPasteButton {
             Button("Allow pasting into apps…") {
-                PasteSimulator.promptForAccessibilityIfNeeded()
+                accessibility.openAccessibilitySettingsPrompt()
             }
         }
         Button("Quit MacClipboard") {
